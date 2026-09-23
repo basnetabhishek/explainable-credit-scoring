@@ -1,6 +1,10 @@
 # Explainable AI & Fairness Analysis — Credit Card Default Prediction
 
-**AI Ethics**
+**Explainable ML · Model evaluation · Fairness assessment**
+
+A documented AI Ethics course case study comparing Random Forest and Explainable Boosting Machine models for credit-card default prediction.
+
+> **Repository status:** This repository contains a written analysis and saved SHAP plots. The executable notebook and dataset are not included, so the reported numerical results cannot currently be reproduced from this checkout.
 
 This project applies Explainable AI and fairness auditing techniques to a credit card default prediction task. Using the UCI Credit Card Default dataset, it trains machine learning models to predict whether a client will default on their next payment, then interrogates those models with a suite of interpretability tools and evaluates them for bias across gender, age, and marital status.
 
@@ -39,7 +43,7 @@ Both models are trained on SMOTE-balanced data and evaluated with classification
 
 ## ⚖️ Fairness Evaluation
 
-The model is audited for disparate treatment across three sensitive attributes using two industry-standard toolkits:
+The analysis compares model outcomes across three sensitive attributes using two industry-standard toolkits:
 
 **Fairlearn** — per-group accuracy, selection rate, true/false positive rates, plus:
 - Demographic (statistical) parity difference
@@ -82,11 +86,11 @@ The most influential features for predicting default were the **repayment status
 | 13 | `MARRIAGE` | 0.035 |
 | 14 | `SEX` | **0.017** (lowest) |
 
-Reassuringly, **`SEX` is the least important feature**, and the model leans most heavily on actual payment behavior (`PAY_0`) — a strong signal that the model is learning financial risk rather than demographics.
+In the reported ranking, `SEX` has the lowest impurity-based importance. Low importance does not establish fairness: correlated features can carry demographic information, and group-level outcomes require separate assessment.
 
 ### SHAP global explanation
 
-![SHAP summary plot](images/shap_summary.png)
+![SHAP summary plot](Result_Image/shap_summary.png)
 
 The SHAP beeswarm summary plot confirms the feature-importance ranking and adds *direction*. Each dot is one client; red = high feature value, blue = low. `PAY_0` dominates: **high recent-repayment-delay values (red) push predictions strongly toward default** (positive SHAP), while clients who paid on time (blue) are pushed toward no-default. Bill and payment amounts contribute in a more mixed way, and demographic features cluster near zero impact.
 
@@ -95,10 +99,10 @@ The SHAP beeswarm summary plot confirms the feature-importance ranking and adds 
 Waterfall plots break down a single prediction, showing how each feature moved it from the base rate to the final output.
 
 **Instance 0**
-![SHAP waterfall for instance 0](images/shap_waterfall_instance0.png)
+![SHAP waterfall for instance 0](Result_Image/shap_waterfall_instance0.png)
 
 **Instance 1**
-![SHAP waterfall for instance 1](images/shap_waterfall_instance1.png)
+![SHAP waterfall for instance 1](Result_Image/shap_waterfall_instance1.png)
 
 These per-client breakdowns are what make the model *actionable*: for any individual decision you can see exactly which features (usually recent repayment status and bill/payment amounts) pushed the prediction up or down.
 
@@ -111,21 +115,21 @@ Anchors produce high-precision IF-THEN rules:
 
 ### Counterfactual explanations (DiCE)
 
-DiCE generated realistic "what-if" scenarios showing the minimal changes needed to flip a prediction (e.g., adjusting repayment-status and marriage-category features to turn a predicted defaulter into a non-defaulter), giving clients concrete, if simplified, paths to a different outcome.
+The analysis reports DiCE counterfactual examples that change model predictions. These are model-behavior illustrations, not validated advice: categorical or personal-attribute changes may be infeasible or inappropriate, and a changed prediction does not establish a causal outcome.
 
 ### Fairness results
 
-**Fairlearn** (lower absolute values = more fair; 0 is perfect parity):
+**Reported Fairlearn results** (zero indicates parity for the particular difference metric, not overall fairness):
 
-| Sensitive attribute | Statistical Parity Diff. | Equal Opportunity Diff. | Verdict |
+| Sensitive attribute | Statistical Parity Diff. | Equal Opportunity Diff. | Reported comparison |
 |---|---|---|---|
-| **Gender** | 0.007 | 0.006 | ✅ Essentially fair |
-| **Marital status** | 0.032 | 0.044 | ⚠️ Mild disparity |
-| **Age group** | 0.074 | 0.069 | ⚠️ Largest disparity |
+| **Gender** | 0.007 | 0.006 | Smallest reported gap |
+| **Marital status** | 0.032 | 0.044 | Intermediate reported gap |
+| **Age group** | 0.074 | 0.069 | Largest reported gap |
 
 The age-group gap is driven by the **"Older" (>50) group**, which had a noticeably higher selection rate (0.19 vs. ~0.12) and false-positive rate (0.12 vs. ~0.06) than younger groups.
 
-**AIF360** (Disparate Impact closest to 1.0 = most fair):
+**Reported AIF360 results** (a disparate-impact ratio of 1 indicates parity for the specified selection-rate comparison):
 
 | Comparison | Disparate Impact | Statistical Parity Diff. |
 |---|---|---|
@@ -134,47 +138,32 @@ The age-group gap is driven by the **"Older" (>50) group**, which had a noticeab
 | **Age: Middle-aged vs. Young** | 0.974 | −0.023 |
 | **Age: Middle-aged vs. Older** | **0.931** | **−0.061** |
 
-Both toolkits agree: the model is **very fair on gender and marital status**, but shows the **most meaningful disparity across age groups**, specifically disadvantaging older clients. This is the key fairness finding and the natural focus for any bias-mitigation follow-up.
+The written analysis reports larger gaps across age groups than across gender or marital status. These descriptive comparisons do not certify fairness. The source notebook, group definitions, favorable-outcome encoding, sample sizes, and uncertainty estimates are needed to verify the calculations and interpret their implications.
 
 ### Summary of findings
 
-1. The models rely on **financial behavior, not demographics** — `SEX` was the single least important feature.
+1. Repayment and financial-history variables rank highly in the reported feature importance; this does not rule out demographic proxy effects.
 2. **Recent repayment status (`PAY_0`)** is the dominant driver across every explanation method (importance, SHAP, Anchors).
 3. Both models under-detect the minority "default" class (recall ≈ 0.48), the most consequential error type in lending.
-4. Fairness is strong for **gender and marital status** but the model is **less fair across age groups**, particularly for **older clients** — the clearest area for improvement.
+4. The reported age-group disparities warrant further investigation; small gaps on other metrics are not proof of fairness.
 
-> 📌 The exact numbers above come from one run of the notebook. Re-running may shift values slightly depending on library versions and randomness, though `random_state=42` is set throughout for reproducibility.
+## Inspect the analysis
 
-## 🛠️ Requirements
+- Read the model comparisons and reported results above.
+- Open the saved [SHAP summary](Result_Image/shap_summary.png) and individual waterfall plots.
+- See [the accompanying write-up](explainable_fair_credit.md) for the course-project narrative.
 
-```bash
-pip install pandas numpy matplotlib seaborn scikit-learn statsmodels
-pip install interpret shap lime alibi dice-ml
-pip install imbalanced-learn fairlearn aif360 'aif360[all]'
-```
+The original `explainable_fair_credit.ipynb` and `UCI_Credit_Card.csv` are absent. This repository is currently a case-study artifact, not a runnable training package. Reproduction requires restoring the notebook, obtaining the dataset, and documenting dependencies, preprocessing, split strategy, and metric definitions.
 
-## 🚀 How to Run
+The write-up lists equalized odds in the methods but equal opportunity in the results table. Those are different metrics; the values are retained as reported pending verification against the original notebook.
 
-**Option 1 — Google Colab (recommended):**
-1. Open `explainable_fair_credit.ipynb` in Colab
-2. Upload `UCI_Credit_Card.csv` to the Colab session (`/content/`)
-3. Run all cells — install commands are included in the notebook
+## Repository structure
 
-**Option 2 — Local Jupyter:**
-1. Install the requirements above
-2. Update the CSV path in the data-loading cells (from `/content/UCI_Credit_Card.csv` to your local path)
-3. Launch Jupyter and run the notebook top to bottom
-
-## 📁 Repository Structure
-
-```
-├── explainable_fair_credit.ipynb   # Main notebook: modeling, XAI, and fairness analysis
-├── README.md                       # This file
-├── images/                         # Result plots referenced in this README
-│   ├── shap_summary.png
-│   ├── shap_waterfall_instance0.png
-│   └── shap_waterfall_instance1.png
-└── UCI_Credit_Card.csv             # Dataset 
+```text
+README.md                    Project overview and reported results
+explainable_fair_credit.md    Accompanying written analysis
+Result_Image/                Saved SHAP plots
+LICENSE                      Repository license
 ```
 
 ## 📚 Key Libraries & References
