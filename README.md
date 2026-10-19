@@ -1,192 +1,173 @@
-# Explainable AI & Fairness Analysis — Credit Card Default Prediction
+# Explainable Credit Scoring
 
-**Explainable ML · Model evaluation · Fairness assessment**
+An AI Ethics course project exploring credit-card default prediction, model explanations, and differences in model outcomes across demographic groups. The notebook compares a Random Forest with an Explainable Boosting Machine (EBM), then uses SHAP, LIME, Anchors, DiCE, Fairlearn, and AIF360 to examine model behavior.
 
-A documented AI Ethics course case study comparing Random Forest and Explainable Boosting Machine models for credit-card default prediction.
+**The notebook, project dataset, and saved plots are included.** The numerical results below come from the notebook's saved outputs. File contents and dataset structure have been checked, but a fresh end-to-end execution has not been verified. Known inconsistencies are documented below.
 
-> **Repository status:** The original [Jupyter notebook](explainable_fair_credit.ipynb) and saved SHAP plots are included. The supplied [project dataset](UCI_Credit_Card.csv) is included; a fresh execution has not been verified.
+## Explore the project
 
-This project applies Explainable AI and fairness auditing techniques to a credit card default prediction task. Using the UCI Credit Card Default dataset, it trains machine learning models to predict whether a client will default on their next payment, then interrogates those models with a suite of interpretability tools and evaluates them for bias across gender, age, and marital status.
+- [Main notebook](explainable_fair_credit.ipynb)
+- [Open the notebook in Google Colab](https://colab.research.google.com/github/basnetabhishek/explainable-credit-scoring/blob/main/explainable_fair_credit.ipynb)
+- [Project dataset](UCI_Credit_Card.csv)
+- [Saved SHAP plots](images/)
 
-## 📊 Dataset
+## Dataset
 
-**[Default of Credit Card Clients (UCI / Taiwan)](https://www.kaggle.com/datasets/uciml/default-of-credit-card-clients-dataset)** — 30,000 clients with demographic attributes (sex, age, education, marriage), credit limits, payment history, bill statements, and payment amounts.
+The included `UCI_Credit_Card.csv` is the supplied project version of the [Default of Credit Card Clients dataset](https://archive.ics.uci.edu/dataset/350/default%2Bof%2Bcredit%2Bcard%2Bclients). The UCI source describes 23 predictors; this project CSV contains **14 predictors, an ID column, and the target**. It should not be described as the complete original feature set.
 
-The included [UCI_Credit_Card.csv](UCI_Credit_Card.csv) is the user-supplied project file, with **30,000 rows and 16 columns**, matching the notebook's saved dataset shape and columns. It has no empty fields; the target contains 23,364 no-default and 6,636 default records.
+| Property | Included CSV |
+|---|---|
+| Records | 30,000 |
+| Columns | 16 |
+| Identifier | `ID`, with 30,000 unique values |
+| Target | `default.payment.next.month` |
+| No default, class 0 | 23,364 records (77.88%) |
+| Default, class 1 | 6,636 records (22.12%) |
+| Empty fields | None found |
 
-- **Target:** `default.payment.next.month` (1 = default, 0 = no default)
-- Class imbalance in the training set is handled with **SMOTE** oversampling.
+The predictors are:
 
+| Group | Columns |
+|---|---|
+| Credit limit | `LIMIT_BAL` |
+| Recorded demographic attributes | `SEX`, `EDUCATION`, `MARRIAGE`, `AGE` |
+| Repayment status | `PAY_0`, `PAY_2`, `PAY_3` |
+| Bill amounts | `BILL_AMT1`, `BILL_AMT2`, `BILL_AMT3` |
+| Payment amounts | `PAY_AMT1`, `PAY_AMT2`, `PAY_AMT3` |
 
-## 🧠 Models
+The CSV's dimensions, column names, and first five records match the notebook's saved data preview. This does not establish that every record is identical to the historical training input.
 
-| Model | Library | Purpose |
+The notebook recodes `SEX` from 1 = male and 2 = female to 1 = male and 0 = female. It defines age groups as **Young: under 30**, **Middle-aged: 30–50 inclusive**, and **Older: over 50**. The Fairlearn marital-status analysis uses codes 1, 2, and 3, excluding code 0; the AIF360 marital-status comparison uses only 1 = married and 2 = single.
+
+## Analysis workflow
+
+The notebook contains several separate experiments. Their predictions and metrics should be interpreted within the section that produced them.
+
+| Section | Models and preprocessing | Holdout split in the visible code |
 |---|---|---|
-| Random Forest Classifier | scikit-learn | Black-box baseline explained post-hoc |
-| Explainable Boosting Machine (EBM) | InterpretML | Inherently interpretable glass-box model |
+| Main model comparison, SHAP, EBM explanations, and LIME | Random Forest and EBM; training-only SMOTE; `SEX` recoded; main feature selection retains `ID` | 30% test, stratified, `random_state=42` |
+| Anchors and DiCE | Separate Random Forest pipeline with `StandardScaler`; one-hot encoding of `EDUCATION` and `MARRIAGE`; `ID` retained; no SMOTE | 20% test, stratified, `random_state=42` |
+| Fairlearn | Separate Random Forest; `ID` dropped; `SEX` recoded; no SMOTE | 30% test, no stratification, `random_state=42` |
+| AIF360 | Another Random Forest; `ID` dropped; `SEX` recoded; no SMOTE | 30% test, stratified, `random_state=42` |
 
-Both models are trained on SMOTE-balanced data and evaluated with classification reports (precision, recall, F1) on a held-out test set.
+The main Random Forest uses `RandomForestClassifier(random_state=42)`. The EBM uses `ExplainableBoostingClassifier(max_bins=64, random_state=42)`. The saved SMOTE output shows **16,355 training samples per class** after resampling.
 
-## 🔍 Explainability Techniques
+## Saved model results
+
+The main comparison reports a test set of **9,000 records**: 7,009 no-default and 1,991 default cases. Values below retain the classification report's two-decimal rounding.
+
+| Model | Accuracy | Default precision | Default recall | Default F1 |
+|---|---|---|---|---|
+| Random Forest | 0.77 | 0.49 | 0.48 | 0.48 |
+| Explainable Boosting Machine | 0.75 | 0.44 | 0.47 | 0.46 |
+
+The Random Forest has higher saved accuracy and default-class F1 than the EBM, while both detect fewer than half of actual default cases. Predicting class 0 for every test record would achieve **77.88% accuracy** (7,009 / 9,000), so accuracy alone does not demonstrate improvement over a majority-class baseline. That baseline would have zero recall for default cases.
+
+## Model explanations
 
 ### Global explanations
-- **EBM global feature importance** — built-in interpretability from the glass-box model
-- **Random Forest feature importances** — impurity-based ranking
-- **SHAP (TreeExplainer)** — summary plots showing feature impact across the test set
+
+The notebook includes EBM global explanations, Random Forest impurity-based feature importance, and a SHAP summary for **class 1: default**.
+
+The saved impurity-importance output ranks `PAY_0` (0.100077), `BILL_AMT1` (0.096109), `LIMIT_BAL` (0.094582), and `PAY_AMT1` (0.085795) highest. The saved SHAP plot has a different ordering: `PAY_0` appears first and `MARRIAGE` second. These are different importance measures; the SHAP plot does not support a blanket claim that demographic features have negligible influence.
+
+![Saved SHAP summary for the default class](images/shap_summary.png)
+
+In this plot, positive SHAP values increase the explained class-1 model output and negative values decrease it. Colors indicate relative feature values. Feature attribution describes this model's behavior; it does not establish causation or fairness.
 
 ### Local explanations
-- **SHAP waterfall plots** — per-instance breakdowns of how each feature pushes a prediction toward default or non-default
-- **EBM local explanations** — instance-level views for both positive and negative examples
-- **LIME** — local surrogate explanations for individual predictions
 
-### Rule-based & counterfactual explanations
-- **Anchors (Alibi)** — high-precision IF-THEN rules that "anchor" a prediction, with precision and coverage reported
-- **Counterfactuals (DiCE)** — minimal feature changes that would flip a prediction (default → no default, and vice versa)
+The notebook includes EBM and LIME explanations for selected cases, plus the saved SHAP waterfall plots below for test-set positions 0 and 1. These positions are not dataset ID values.
 
-## ⚖️ Fairness Evaluation
+**The waterfall plots have a known base-value error.** Their code uses the first feature's SHAP contribution as `base_values`, rather than the explainer's class-specific expected value. The images are retained as original outputs; their displayed endpoints should not be treated as verified prediction probabilities. See the [SHAP additivity documentation](https://shap.readthedocs.io/en/latest/generated/shap.TreeExplainer.html).
 
-The analysis compares model outcomes across three sensitive attributes using two industry-standard toolkits:
+![Original SHAP waterfall for test position 0](images/shap_waterfall_instance0.png)
 
-**Fairlearn** — per-group accuracy, selection rate, true/false positive rates, plus:
-- Demographic (statistical) parity difference
-- Equalized odds difference
+![Original SHAP waterfall for test position 1](images/shap_waterfall_instance1.png)
 
-**AIF360** — disparate impact, statistical parity difference, equal opportunity difference, and average odds difference for:
-- **Gender** (Male vs. Female)
-- **Age groups** (Young < 30, Middle-aged 30–50, Older > 50 — pairwise comparisons)
-- **Marital status** (Married vs. Single)
+### Anchors and counterfactuals
 
-## 📈 Results
+The separate Anchors experiment reports these examples:
 
-### Data preparation
-- The dataset has **30,000 clients** and **no missing values**.
-- The target is imbalanced, so **SMOTE** was used to balance the training set to **16,355 samples per class** (default vs. no-default) before training.
-
-### Model performance
-
-Both models were evaluated on a held-out test set. The Random Forest slightly outperforms the EBM overall, but both struggle to recall the minority "default" class — a common and important pattern in credit risk data.
-
-| Model | Accuracy | Default (class 1) Precision | Default Recall | Default F1 |
-|---|---|---|---|---|
-| **Random Forest** | 0.77 | 0.49 | 0.48 | 0.48 |
-| **EBM (glass-box)** | 0.75 | 0.44 | 0.47 | 0.46 |
-
-Both models predict the "no default" class well (F1 ≈ 0.85) but only catch roughly **half of actual defaulters**. In a lending context this is the costly type of error, and it's exactly why the explainability and fairness analysis below matters.
-
-### Global feature importance (Random Forest)
-
-The most influential features for predicting default were the **repayment status and financial-history variables**, not the demographic ones:
-
-| Rank | Feature | Importance |
-|---|---|---|
-| 1 | `PAY_0` (most recent repayment status) | 0.100 |
-| 2 | `BILL_AMT1` (latest bill amount) | 0.096 |
-| 3 | `LIMIT_BAL` (credit limit) | 0.095 |
-| 4 | `PAY_AMT1` (latest payment amount) | 0.086 |
-| … | … | … |
-| 12 | `EDUCATION` | 0.036 |
-| 13 | `MARRIAGE` | 0.035 |
-| 14 | `SEX` | **0.017** (lowest) |
-
-In the reported ranking, `SEX` has the lowest impurity-based importance. Low importance does not establish fairness: correlated features can carry demographic information, and group-level outcomes require separate assessment.
-
-### SHAP global explanation
-
-![SHAP summary plot](images/shap_summary.png)
-
-The SHAP beeswarm summary plot confirms the feature-importance ranking and adds *direction*. Each dot is one client; red = high feature value, blue = low. `PAY_0` dominates: **high recent-repayment-delay values (red) push predictions strongly toward default** (positive SHAP), while clients who paid on time (blue) are pushed toward no-default. Bill and payment amounts contribute in a more mixed way, and demographic features cluster near zero impact.
-
-### SHAP local explanations (individual predictions)
-
-Waterfall plots break down a single prediction, showing how each feature moved it from the base rate to the final output.
-
-**Instance 0**
-![SHAP waterfall for instance 0](images/shap_waterfall_instance0.png)
-
-**Instance 1**
-![SHAP waterfall for instance 1](images/shap_waterfall_instance1.png)
-
-These per-client breakdowns are what make the model *actionable*: for any individual decision you can see exactly which features (usually recent repayment status and bill/payment amounts) pushed the prediction up or down.
-
-### Anchor explanations (rule-based)
-
-Anchors produce high-precision IF-THEN rules:
-
-- **Defaulting client** → rule anchored on `PAY_0 > 0`, `PAY_2 > 0`, `PAY_3 > 0`, `AGE > 34`, and several bill/payment thresholds. **Precision ≈ 0.81**, coverage ≈ 2.6%. (Consistent late payments across recent months anchor a "default" prediction.)
-- **Non-defaulting client** → a single, broad rule: **`PAY_0 <= -1`** (i.e., paid off the most recent balance). **Precision ≈ 0.86**, coverage ≈ 27.9%. Paying on time alone reliably explains a "no default" prediction for a large slice of clients.
-
-### Counterfactual explanations (DiCE)
-
-The analysis reports DiCE counterfactual examples that change model predictions. These are model-behavior illustrations, not validated advice: categorical or personal-attribute changes may be infeasible or inappropriate, and a changed prediction does not establish a causal outcome.
-
-### Fairness results
-
-**Reported Fairlearn results** (zero indicates parity for the particular difference metric, not overall fairness):
-
-| Sensitive attribute | Statistical Parity Diff. | Equal Opportunity Diff. | Reported comparison |
+| Explained prediction | Saved rule | Precision | Coverage |
 |---|---|---|---|
-| **Gender** | 0.007 | 0.006 | Smallest reported gap |
-| **Marital status** | 0.032 | 0.044 | Intermediate reported gap |
-| **Age group** | 0.074 | 0.069 | Largest reported gap |
+| Default, class 1 | A conjunction of ten conditions, including `PAY_0 > 0`, `PAY_3 > 0`, `PAY_2 > 0`, and `AGE > 34` | 0.8052 | 0.0265 |
+| No default, class 0 | `PAY_0 <= -1` | 0.8630 | 0.2787 |
 
-The age-group gap is driven by the **"Older" (>50) group**, which had a noticeably higher selection rate (0.19 vs. ~0.12) and false-positive rate (0.12 vs. ~0.06) than younger groups.
+The full rules are in the notebook. These precision and coverage values concern the local explanation rules, rather than overall model performance.
 
-**Reported AIF360 results** (a disparate-impact ratio of 1 indicates parity for the specified selection-rate comparison):
+DiCE uses random search and requests three counterfactuals in the opposite class for each selected case. The saved output under the **0 → 1** heading still displays `Target = 0` for all three rows, so successful class reversal is not established for that example. All features are declared continuous, including encoded categories and personal attributes; feasibility constraints require further work before these examples can be interpreted as actionable changes.
 
-| Comparison | Disparate Impact | Statistical Parity Diff. |
+## Saved fairness results
+
+### Fairlearn
+
+This section evaluates a separately trained Random Forest. Its positive outcome is **class 1: predicted default**, so selection rate means the predicted-default rate.
+
+| Attribute | Demographic parity difference | Equalized odds difference |
 |---|---|---|
-| **Gender** (Male vs. Female) | 1.014 | 0.012 |
-| **Married vs. Single** | 1.011 | 0.010 |
-| **Age: Middle-aged vs. Young** | 0.974 | −0.023 |
-| **Age: Middle-aged vs. Older** | **0.931** | **−0.061** |
+| Recorded sex | 0.006535 | 0.006051 |
+| Age group | 0.074218 | 0.068642 |
+| Marital status, codes 1–3 | 0.032057 | 0.043741 |
 
-The written analysis reports larger gaps across age groups than across gender or marital status. These descriptive comparisons do not certify fairness. Review the source notebook, group definitions, favorable-outcome encoding, sample sizes, and uncertainty before interpreting these calculations.
+The notebook prints the second metric as “Equal Opportunity Difference,” but calls `equalized_odds_difference`. This README uses the function's actual name. With the defaults used here, [equalized odds difference](https://fairlearn.org/v0.12/api_reference/generated/fairlearn.metrics.equalized_odds_difference.html) is the larger of the between-group true-positive-rate and false-positive-rate gaps.
 
-### Summary of findings
+Age has the largest saved gaps among these three attributes. In the age table, the Older group has a predicted-default rate of **0.190407** and a false-positive rate of **0.123574**, compared with **0.116189** and **0.054932** for the Middle-aged group. A false positive here means predicting default for a person whose recorded outcome is no default.
 
-1. Repayment and financial-history variables rank highly in the reported feature importance; this does not rule out demographic proxy effects.
-2. **Recent repayment status (`PAY_0`)** is the dominant driver across every explanation method (importance, SHAP, Anchors).
-3. Both models under-detect the minority "default" class (recall ≈ 0.48), the most consequential error type in lending.
-4. The reported age-group disparities warrant further investigation; small gaps on other metrics are not proof of fairness.
+### AIF360
 
-## Run and inspect the analysis
+This section sets **class 0: no default** as the favorable outcome. Its group configuration uses the first group below as `unprivileged` and the second as `privileged`, following the notebook's terminology. Differences are first group minus reference group; disparate impact is the ratio of their predicted-favorable-outcome rates. See the [AIF360 metric definitions](https://aif360.readthedocs.io/en/stable/modules/generated/aif360.metrics.ClassificationMetric.html).
 
-Open [explainable_fair_credit.ipynb](explainable_fair_credit.ipynb), uploaded from `AI_Ethics_Final (1)(1).ipynb` with its original code and saved outputs preserved.
+| Group / reference group | Disparate impact | Statistical parity difference | Equal opportunity difference | Average odds difference |
+|---|---|---|---|---|
+| Female / Male | 1.014031 | 0.012137 | 0.013993 | −0.009370 |
+| Young / Middle-aged | 0.973601 | −0.023351 | −0.013975 | −0.028352 |
+| Older / Middle-aged | 0.931384 | −0.060695 | −0.037072 | −0.057084 |
+| Single / Married | 1.011257 | 0.009767 | −0.001076 | 0.001074 |
 
-The notebook targets Google Colab and reads `/content/UCI_Credit_Card.csv` in several sections. Upload the included [UCI_Credit_Card.csv](UCI_Credit_Card.csv) to Colab under that exact filename. For local Jupyter, replace the Colab-specific import and dataset paths. The CSV is preserved exactly as supplied; its dimensions, columns, and first five records match the notebook's saved preview. The full original training input cannot be verified from saved outputs alone.
+These are saved descriptive results, not a fairness certification. The Fairlearn and AIF360 tables use different model runs, splits, outcome conventions, and group comparisons. They should not be compared as interchangeable measurements. The notebook does not report uncertainty estimates or demonstrate a fairness-mitigation intervention.
 
-The notebook uses pandas, NumPy, matplotlib, seaborn, scikit-learn, statsmodels, imbalanced-learn, InterpretML, SHAP, LIME, Alibi, DiCE, Fairlearn, and AIF360. Versions are not pinned. Review the installation cells before running; the first contains `!pip install - q interpret alibi dice-ml`, whose option should be `-q`. A full rerun has not been performed.
+## Running the notebook
 
-### Interpretation and reproducibility notes
+The original notebook was prepared for Google Colab and reads `/content/UCI_Credit_Card.csv` in multiple sections.
 
-- The Fairlearn results labeled “Equal Opportunity Difference” call `equalized_odds_difference`; the earlier results table retains the original label and reported values. These metrics differ.
-- The saved waterfall plots use `shap_values[instance_index, 0, class_index]` as the base value instead of the explainer's expected value. Treat their endpoints as unvalidated; correcting and regenerating them requires rerunning the model with the dataset.
-- Different notebook sections retrain models with different splits and preprocessing. Compare metrics within their corresponding sections; Fairlearn treats class 1 (default) as positive, while AIF360 sets class 0 (no default) as favorable.
-- The three plots in `images/` are exact copies of the existing `Result_Image/` files and match notebook cells 23, 31, and 32. The original directory is retained.
+1. Open the notebook using the Colab link above.
+2. Upload the included CSV into the runtime so it is available at `/content/UCI_Credit_Card.csv`.
+3. Review the dependency installation cells. Correct the first command from `!pip install - q interpret alibi dice-ml` to `!pip install -q interpret alibi dice-ml` before executing it.
+4. Check the issues below before interpreting a new run. If the runtime requests a restart after installation, restart it before executing the analysis cells in order.
+
+The imported packages include pandas, NumPy, matplotlib, seaborn, scikit-learn, statsmodels, imbalanced-learn, InterpretML, SHAP, LIME, Alibi, DiCE, Fairlearn, and AIF360. The repository has no pinned dependency file. Saved installation logs mention Fairlearn 0.12.0 and AIF360 0.6.1, but these do not define a complete reproducible environment.
+
+For local Jupyter, install compatible dependencies, remove the Colab-specific `from google.colab import files` import, and change **all** `/content/UCI_Credit_Card.csv` reads to the local CSV path. Colab and local execution have not been freshly validated.
+
+## Known issues and reproducibility limits
+
+- **Saved state differs from visible code in places.** The initial feature selection retains `ID` and the saved SHAP array has 15 features, while the saved impurity-importance listing contains only 14 and omits `ID`. A fresh run is needed to reconcile these outputs; historical preprocessing should not be inferred from one table alone.
+- **Identifier and categorical handling need review.** The main code retains `ID` and applies ordinary SMOTE across numerically encoded attributes, which can interpolate category codes. The Anchors/DiCE pipeline also retains `ID`.
+- **The waterfall base values are incorrect.** Correct the class-specific baseline and regenerate the plots before interpreting their endpoints.
+- **Fairlearn print labels are incorrect.** The code computes equalized odds where the output says equal opportunity.
+- **Counterfactual validity is unresolved.** The displayed 0 → 1 example does not show the requested target class, and the feature constraints do not enforce realistic changes.
+- **Results are archived outputs.** Random seeds appear in several models and splits, but dependency versions are not fully pinned and stochastic explanation steps are not all explicitly seeded. No full rerun or deployment validation is claimed.
 
 ## Repository structure
 
 ```text
-README.md
-explainable_fair_credit.ipynb  Original notebook with saved outputs
-UCI_Credit_Card.csv           Supplied project dataset (30,000 rows, 16 columns)
-images/                      SHAP summary and two waterfall plots
-Result_Image/                Preserved original plots
-LICENSE
+.
+├── README.md
+├── explainable_fair_credit.ipynb
+├── UCI_Credit_Card.csv
+├── images/
+│   ├── shap_summary.png
+│   ├── shap_waterfall_instance0.png
+│   └── shap_waterfall_instance1.png
+├── Result_Image/                  # Preserved original plots and placeholder
+└── LICENSE
 ```
 
-The notebook, dataset, and plots are present. A complete rerun remains unverified; see the setup and interpretation notes above.
+The three PNGs in `images/` are exact copies of the original `Result_Image/` plots and match the notebook's saved summary and two waterfall outputs. The notebook and CSV are preserved as supplied.
 
-## 📚 Key Libraries & References
+## Attribution and license
 
-- [InterpretML](https://interpret.ml/) — Explainable Boosting Machines
-- [SHAP](https://shap.readthedocs.io/) — SHapley Additive exPlanations
-- [LIME](https://github.com/marcotcr/lime) — Local Interpretable Model-agnostic Explanations
-- [Alibi](https://docs.seldon.io/projects/alibi/) — Anchor explanations
-- [DiCE](https://interpret.ml/DiCE/) — Diverse Counterfactual Explanations
-- [Fairlearn](https://fairlearn.org/) — Fairness assessment toolkit
-- [AIF360](https://aif360.res.ibm.com/) — AI Fairness 360 (IBM)
+Project by **Abhishek Basnet**, prepared for **INSY 5344 (AI Ethics)**. The repository's software and documentation are covered by its [MIT license](LICENSE).
 
----
-
-*This project was completed as the final project for INSY 5344 (AI Ethics). It demonstrates how interpretability and fairness tooling can be combined to audit a real-world credit risk model.*
+Dataset attribution: I-Cheng Yeh (2009), *Default of Credit Card Clients*, UCI Machine Learning Repository, [doi:10.24432/C55S3H](https://doi.org/10.24432/C55S3H). UCI lists the source dataset under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The included CSV is the supplied reduced-column project version; its full transformation history is not recorded here.
