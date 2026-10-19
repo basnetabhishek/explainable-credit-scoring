@@ -4,13 +4,15 @@
 
 A documented AI Ethics course case study comparing Random Forest and Explainable Boosting Machine models for credit-card default prediction.
 
-> **Repository status:** The original [Jupyter notebook](explainable_fair_credit.ipynb) and saved SHAP plots are included. The dataset is not included; a fresh execution has not been verified.
+> **Repository status:** The original [Jupyter notebook](explainable_fair_credit.ipynb) and saved SHAP plots are included. The supplied [project dataset](UCI_Credit_Card.csv) is included; a fresh execution has not been verified.
 
 This project applies Explainable AI and fairness auditing techniques to a credit card default prediction task. Using the UCI Credit Card Default dataset, it trains machine learning models to predict whether a client will default on their next payment, then interrogates those models with a suite of interpretability tools and evaluates them for bias across gender, age, and marital status.
 
 ## 📊 Dataset
 
 **[Default of Credit Card Clients (UCI / Taiwan)](https://www.kaggle.com/datasets/uciml/default-of-credit-card-clients-dataset)** — 30,000 clients with demographic attributes (sex, age, education, marriage), credit limits, payment history, bill statements, and payment amounts.
+
+The included [UCI_Credit_Card.csv](UCI_Credit_Card.csv) is the user-supplied project file, with **30,000 rows and 16 columns**, matching the notebook's saved dataset shape and columns. It has no empty fields; the target contains 23,364 no-default and 6,636 default records.
 
 - **Target:** `default.payment.next.month` (1 = default, 0 = no default)
 - Class imbalance in the training set is handled with **SMOTE** oversampling.
@@ -151,7 +153,7 @@ The written analysis reports larger gaps across age groups than across gender or
 
 Open [explainable_fair_credit.ipynb](explainable_fair_credit.ipynb), uploaded from `AI_Ethics_Final (1)(1).ipynb` with its original code and saved outputs preserved.
 
-The notebook targets Google Colab and reads `/content/UCI_Credit_Card.csv` in several sections. Obtain the CSV from the dataset link above and upload it to Colab under that exact filename. For local Jupyter, replace the Colab-specific import and dataset paths. The CSV was not attached and is not included in this repository; saved preview rows cannot reconstruct the full dataset.
+The notebook targets Google Colab and reads `/content/UCI_Credit_Card.csv` in several sections. Upload the included [UCI_Credit_Card.csv](UCI_Credit_Card.csv) to Colab under that exact filename. For local Jupyter, replace the Colab-specific import and dataset paths. The CSV is preserved exactly as supplied; its dimensions, columns, and first five records match the notebook's saved preview. The full original training input cannot be verified from saved outputs alone.
 
 The notebook uses pandas, NumPy, matplotlib, seaborn, scikit-learn, statsmodels, imbalanced-learn, InterpretML, SHAP, LIME, Alibi, DiCE, Fairlearn, and AIF360. Versions are not pinned. Review the installation cells before running; the first contains `!pip install - q interpret alibi dice-ml`, whose option should be `-q`. A full rerun has not been performed.
 
@@ -167,12 +169,13 @@ The notebook uses pandas, NumPy, matplotlib, seaborn, scikit-learn, statsmodels,
 ```text
 README.md
 explainable_fair_credit.ipynb  Original notebook with saved outputs
+UCI_Credit_Card.csv           Supplied project dataset (30,000 rows, 16 columns)
 images/                      SHAP summary and two waterfall plots
 Result_Image/                Preserved original plots
 LICENSE
 ```
 
-`UCI_Credit_Card.csv` must be supplied separately.
+The notebook, dataset, and plots are present. A complete rerun remains unverified; see the setup and interpretation notes above.
 
 ## 📚 Key Libraries & References
 
